@@ -21,7 +21,7 @@ from copy import *
 with open('Lebedev_131.json', 'r') as f:
     Lebedev_131= np.array(json.load(f))
 
-'''lebedev integration order 131th, averaged with N=50 random rotations.'''
+'''lebedev integration order 131th, averaged with N=10 random rotations.'''
 Trial=10
 Rl = [ortho_group.rvs(3) for i in range(Trial)]
 def lebedev(func,N=Trial,**kwargs):
@@ -73,8 +73,6 @@ def I(M):
         a1=lebedev(f1)
         a2=lebedev(f2)
         a3=lebedev(f3)
-        #Aa=np.array([a1,a2,a3])
-        #nAa=2*np.dot(Aa,M[ind][1:4])/np.dot(M[ind][1:4],M[ind][1:4])*M[ind][1:4]-Aa
         ja=np.array([a0,a1,a2,a3])
         J.append(ja)
     sum=0
@@ -92,64 +90,71 @@ def I(M):
     return J
 
 
-'''Constructing counter example:  M'''
-M=np.array([[ 4.94246961e-01, -7.18672265e-02,  6.71420306e-02, -2.26709206e-01],
-[3.61137905e-02, 4.45375851e-04, -1.03128011e-03, 1.80219191e-02],
- [ 1.10267191e-01,  6.94156528e-03,  3.37531219e-04,  5.46938212e-02],
- [ 3.59372057e-01,  6.44802853e-02, -6.64482817e-02,  1.53993466e-01]])
+'''Constructing example:  M'''
+a=0.005
+mm1=np.array([0,-np.sqrt(1-a**2),a,0])
+mm2=np.array([0,-np.sqrt(1-a**2),-1/2*a,-np.sqrt(3)/2*a])
+mm3=np.array([0,-np.sqrt(1-a**2),-1/2*a, np.sqrt(3)/2*a])
+mm4=np.array([0,1,0,0])
+me1=np.array([mm1,mm2,mm3,mm4])
+nsspace = scipy.linalg.null_space(np.array(me1).transpose()).transpose()
+nu1=nsspace[0][0]/np.sum(nsspace[0])
+nu2=nsspace[0][1]/np.sum(nsspace[0])
+nu3=nsspace[0][2]/np.sum(nsspace[0])
+nu4=nsspace[0][3]/np.sum(nsspace[0])
+eta=1/2
+M1=nu1*np.array([1,0,0,0])+nu1*mm1*eta
+M2=nu2*np.array([1,0,0,0])+nu2*mm2*eta
+M3=nu3*np.array([1,0,0,0])+nu3*mm3*eta
+M4=nu4*np.array([1,0,0,0])+nu4*mm4*eta
+M=np.array([M4,M1,M3,M2])
 
-'''Constructing counter example:  14-effect JA'''
-JA=I(M) 
+# Assuming you have the matrix A and array b defined
+# A should be a 30x54 matrix and b should be a 30x1 array
+def linearsolver(M):
+    for i in range(20):
+        global Rl
+        Rl = [ortho_group.rvs(3) for i in range(Trial)]
+        JA=I(M)
+        AT = []
+        for j in range(4):
+            for i in range(14):
+                a = np.zeros((4, 4))
+                a[j] = JA[i]
+                b = np.zeros(14)
+                b[i] = 1
+                a = np.append(a.flatten(), b)
+                AT.append(a)
+        A = np.array(AT).T
+        # Define the constraint matrix A and RHS values b
+        b = np.append(M, np.array([1 for i in range(14)]))
+        # Create a Gurobi model
+        model = gp.Model()
+        model.Params.OutputFlag = 0
+        # Number of variables (size of x)
+        num_vars = A.shape[1]
+
+        # Create variables
+        x = model.addVars(num_vars, name="x", lb=0)  # lb=0 enforces nonnegativity
+
+        # Add equality constraints
+        for i in range(A.shape[0]):
+            model.addConstr(gp.quicksum(A[i, j] * x[j] for j in range(num_vars)) == b[i])
+
+        # Optimize the model
+        model.optimize()
+
+        # Access solution
+        if model.status == gp.GRB.OPTIMAL:
+            x_solution = [x[i].x for i in range(num_vars)]
+            P2=np.array(x_solution).reshape(4,14)
+            print("Solution x:", P2)
+            break
+        else:
+            print("Optimization failed")
+
+        # Dispose of the model
+        model.dispose()
 
 
-
-'''LP solver with guroby, where the value output is -by, with constrain -AT<=0'''
-def LPguroby(JA,M):
-
-    model = gp.Model("LinearOptimization")
-
-    # Number of variables and constraints
-    num_vars = 30
-    num_constraints = 56
-
-    # Create variables
-    variables = [model.addVar(lb=-1, ub=1, name="x{}".format(i)) for i in range(num_vars)]
-
-    # Define the objective coefficients
-    objective_coefficients = np.append(M,np.array([1 for i in range(14)]))
-
-    # Set objective function
-    model.setObjective(gp.quicksum(objective_coefficients[i] * variables[i] for i in range(num_vars)), sense=gp.GRB.MINIMIZE)
-    AT=[]
-    for j in range(4):
-        for i in range(14):
-            a = np.zeros((4, 4))
-            a[j] = JA[i]
-            b = np.zeros(14)
-            b[i] = 1
-            a = np.append(a.flatten(), b)
-            AT.append(a)
-    AT = np.array(AT)
-    # Define the constraint matrix A and RHS values b
-    constraint_matrix = AT
-    rhs_values =np.array([0 for i in range(56)])
-
-    # Add constraints
-    constraints = [model.addConstr(gp.quicksum(constraint_matrix[i, j] * variables[j] for j in range(num_vars)) >= rhs_values[i]) for i in range(num_constraints)]
-
-    # Optimize the model
-    model.optimize()
-
-    # Access solution
-    if model.status == gp.GRB.OPTIMAL:
-        print("Optimal solution found")
-        print("y=", np.array([variables[i].x for i in range(30)]))
-    elif model.status == gp.GRB.INFEASIBLE:
-        print("Model is infeasible")
-    elif model.status == gp.GRB.UNBOUNDED:
-        print("Model is unbounded")
-    else:
-        print("Optimization ended with status:", model.status)
-    return 0
-
-LPguroby(JA,M)
+linearsolver(M)
