@@ -14,8 +14,7 @@ from numpy.linalg import norm
 import scipy
 from copy import *
 
-'''This script use Farka's lemma to prove Observation 2 in the method section
- : There exist noisy POVM that can not be simulated by a 14-effect Parent'''
+'''This script use linear program to search for a response function for simulating M with its corresponding 14-effect coarse-grained POVM'''
 
 
 with open('Lebedev_131.json', 'r') as f:
