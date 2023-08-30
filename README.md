@@ -8,5 +8,5 @@ This repository contains code related to numerical integration using Lebedev poi
 
 - `compatiblemodel_NC.py`: This script provides an explicit construction of a compatible model for any 4-outcome noisy POVM. Users can define their own POVMs and compute an 18-effect POVM along with the corresponding response function.
 
-- `linearsolver_guroby.py`: This example script illustrates that 14-effect POVMs may not always be sufficient for simulating the corresponding children POVM. The demonstration is carried out using linear programming, which is discussed as Farka's lemma in the methods section of our work.
+- `brute force linear solver.py`: This example script illustrates that 14-effect POVMs can be used for simulating the corresponding children POVM. The demonstration is carried out using linear programming, and due to the limited precision of the spherical numerical integration, a model might not exist in extremal cases without sufficent number of trials .
 
